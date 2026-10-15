@@ -1,0 +1,55 @@
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg-link
+
+# ── Virtual environments ─────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# ── Jupyter ──────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── macOS / system files ─────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ── IDEs ─────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# ── Model artifacts ──────────────────────────────────────────
+models/*.joblib
+models/*.pkl
+
+# ── Generated outputs ────────────────────────────────────────
+outputs/*.csv
+outputs/*.json
+outputs/*.png
+
+# Keep empty folders
+!models/.gitkeep
+!outputs/.gitkeep
+
+# ── Logs & temp files ────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+*.swp
+~$*
