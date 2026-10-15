@@ -204,6 +204,17 @@ def load_selected_dataset(
         X: pd.DataFrame = dataframe.drop(columns=[selected_target]).copy()
         feature_names = list(X.columns)
         class_names = [str(value) for value in sorted(pd.unique(y), key=str)]
+
+        # Validate class counts early so stratified splitting can't fail later.
+        counts = y.value_counts(dropna=True)
+        min_count = int(counts.min()) if len(counts) > 0 else 0
+        if min_count < 2:
+            raise ValueError(
+                f"The least populated class in the target column '{selected_target}' has only {min_count} "
+                "member(s). Stratified train/test splitting requires at least 2 members per class. "
+                "Please choose a different target column or supply more labeled rows for each class."
+            )
+
         return X, y, feature_names, class_names
 
     resolved_name = (selected_dataset_name or "breast_cancer").lower()
