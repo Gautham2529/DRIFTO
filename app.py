@@ -15,6 +15,8 @@ Feature drift alone does not prove that model performance has degraded.
 from __future__ import annotations
 
 # pylint: disable=no-member
+# Streamlit widget values live at module scope and are intentionally mutable.
+# pylint: disable=invalid-name
 
 import io
 from typing import cast
@@ -59,9 +61,12 @@ except ImportError:  # pragma: no cover - allows app to run when Plotly is absen
     class _FallbackPX:
         # pylint: disable=disallowed-name
         @staticmethod
-        def bar(data_frame, x=None, y=None, color=None, _orientation="v", **_unused_kwargs):
+        def bar(
+            data_frame, x=None, y=None, color=None,
+            orientation="v", **_unused_kwargs
+        ):
             """Create a bar chart fallback when Plotly is unavailable."""
-            del _orientation
+            del orientation
             del _unused_kwargs
             enc = {}
             if x is not None:
@@ -192,6 +197,10 @@ def load_selected_dataset(
                 "Please upload a CSV file before running the model.")
 
         dataframe = pd.read_csv(io.BytesIO(uploaded_file_bytes))
+        if dataframe.empty:
+            raise ValueError("The uploaded CSV contains no data rows.")
+        if dataframe.columns.duplicated().any():
+            raise ValueError("The uploaded CSV contains duplicate column names.")
         if target_name is None:
             target_name = infer_target_column(dataframe)
         if target_name is None or target_name not in dataframe.columns:
@@ -201,12 +210,29 @@ def load_selected_dataset(
 
         selected_target = target_name
         y: pd.Series = dataframe.loc[:, selected_target].copy()
-        X: pd.DataFrame = dataframe.drop(columns=[selected_target]).copy()
-        feature_names = list(X.columns)
+        features_frame: pd.DataFrame = dataframe.drop(
+            columns=[selected_target]
+        ).copy()
+        valid_targets = y.notna()
+        features_frame = features_frame.loc[valid_targets].reset_index(drop=True)
+        y = y.loc[valid_targets].reset_index(drop=True)
+        if features_frame.shape[1] == 0:
+            raise ValueError("The CSV must contain at least one feature column.")
+        non_numeric = list(
+            features_frame.select_dtypes(exclude=[np.number]).columns
+        )
+        if non_numeric:
+            raise ValueError(
+                "All CSV feature columns must be numeric. Unsupported columns: "
+                + ", ".join(map(str, non_numeric))
+            )
+        feature_names = list(features_frame.columns)
         class_names = [str(value) for value in sorted(pd.unique(y), key=str)]
 
         # Validate class counts early so stratified splitting can't fail later.
         counts = y.value_counts(dropna=True)
+        if counts.empty:
+            raise ValueError("The selected target column has no labeled rows.")
         min_count = int(counts.min()) if len(counts) > 0 else 0
         if min_count < 2:
             raise ValueError(
@@ -215,7 +241,10 @@ def load_selected_dataset(
                 "Please choose a different target column or supply more labeled rows for each class."
             )
 
-        return X, y, feature_names, class_names
+        return features_frame, y, feature_names, class_names
+
+    if source_choice != "builtin":
+        raise ValueError(f"Unsupported dataset source '{source_choice}'.")
 
     resolved_name = (selected_dataset_name or "breast_cancer").lower()
     if resolved_name not in BUILTIN_DATASETS:
@@ -248,26 +277,41 @@ def train_baseline(
     target_column_name: str | None = None,
     random_seed: int = 42,
 ):
-    X, y, feature_names, class_names = load_selected_dataset(
+    """Fit a baseline model and evaluate it on a stratified reference split."""
+    features_frame, y, feature_names, class_names = load_selected_dataset(
         source_choice=source_name,
         selected_dataset_name=selected_dataset_name,
         _uploaded_file_name=_uploaded_file_name,
         uploaded_file_bytes=uploaded_file_bytes,
         target_name=target_column_name,
     )
-    X_train, reference_X, y_train, reference_y = train_test_split(
-        X, y, test_size=0.2, random_state=random_seed, stratify=y
+    if features_frame.empty or features_frame.shape[1] == 0:
+        raise ValueError("The dataset must contain at least one row and feature.")
+    if y.isna().any():
+        raise ValueError("The target column contains missing labels; remove those rows.")
+    features_frame = features_frame.apply(pd.to_numeric, errors="raise")
+    X_train, reference_x, y_train, reference_y = train_test_split(
+        features_frame, y, test_size=0.2, random_state=random_seed, stratify=y
     )
+    medians = X_train.median()
+    if medians.isna().any():
+        raise ValueError("Feature columns must contain at least one numeric value each.")
+    X_train = X_train.fillna(medians)
+    reference_x = reference_x.fillna(medians)
+    if not np.isfinite(X_train.to_numpy(dtype=float)).all() or not np.isfinite(
+        reference_x.to_numpy(dtype=float)
+    ).all():
+        raise ValueError("Feature columns must not contain infinite values.")
     model = RandomForestClassifier(
         n_estimators=250, random_state=random_seed, class_weight="balanced"
     )
     model.fit(X_train, y_train)
-    predictions = model.predict(reference_X)
+    predictions = model.predict(reference_x)
     metrics = calculate_metrics(reference_y, predictions)
     return (
         model,
         X_train,
-        reference_X,
+        reference_x,
         y_train,
         reference_y,
         predictions,
@@ -278,20 +322,33 @@ def train_baseline(
 
 
 def calculate_metrics(y_true, y_pred):
+    """Calculate weighted classification metrics without zero-division warnings."""
     return {
         "accuracy": accuracy_score(y_true, y_pred),
-        "precision": precision_score(y_true, y_pred, average="weighted", zero_division="warn"),
-        "recall": recall_score(y_true, y_pred, average="weighted", zero_division="warn"),
-        "f1": f1_score(y_true, y_pred, average="weighted", zero_division="warn"),
+        "precision": precision_score(
+            y_true, y_pred, average="weighted", zero_division=0
+        ),
+        "recall": recall_score(
+            y_true, y_pred, average="weighted", zero_division=0
+        ),
+        "f1": f1_score(y_true, y_pred, average="weighted", zero_division=0),
     }
 
 
-def simulate_production(reference: pd.DataFrame, shift_magnitude: float, random_seed: int):
+def simulate_production(
+    reference: pd.DataFrame, shift_magnitude: float, random_seed: int
+):
     """Create reproducible simulated data by shifting selected numeric features."""
+    if not np.isfinite(shift_magnitude) or shift_magnitude < 0:
+        raise ValueError("Shift strength must be a finite, non-negative number.")
     rng = np.random.default_rng(random_seed)
     simulated = reference.copy().reset_index(drop=True)
-    columns = list(simulated.columns)
-    count = max(1, min(6, len(columns) // 8))
+    if reference.empty or reference.shape[1] == 0:
+        raise ValueError("Reference data must contain at least one row and feature.")
+    columns = list(simulated.select_dtypes(include=[np.number]).columns)
+    if not columns:
+        raise ValueError("Reference data must contain numeric features to simulate drift.")
+    count = max(1, min(6, max(1, len(columns) // 8)))
     shifted_columns = columns[:count]
 
     for feature_name in shifted_columns:
@@ -307,11 +364,20 @@ def simulate_production(reference: pd.DataFrame, shift_magnitude: float, random_
 
 
 def calculate_drift(reference: pd.DataFrame, current: pd.DataFrame, threshold: float):
+    """Compare numeric features and return standardized mean-shift scores."""
+    if not np.isfinite(threshold) or threshold < 0:
+        raise ValueError("Drift threshold must be a finite, non-negative number.")
+    if list(reference.columns) != list(current.columns):
+        raise ValueError("Reference and simulated data must have matching columns.")
+    if reference.empty or current.empty:
+        raise ValueError("Reference and simulated data must each contain at least one row.")
     rows = []
-    for feature_name in reference.columns:
+    for feature_name in reference.select_dtypes(include=[np.number]).columns:
         ref_mean = float(reference[feature_name].mean())
         new_mean = float(current[feature_name].mean())
         ref_std = float(reference[feature_name].std(ddof=0))
+        if not np.isfinite(ref_mean) or not np.isfinite(new_mean):
+            raise ValueError(f"Feature '{feature_name}' contains non-finite values.")
         score = abs(new_mean - ref_mean) / ref_std if ref_std > 1e-12 else 0.0
         rows.append({
             "Feature": feature_name,
@@ -322,7 +388,13 @@ def calculate_drift(reference: pd.DataFrame, current: pd.DataFrame, threshold: f
             "Drift score": score,
             "Drift detected": bool(score >= threshold),
         })
-    return pd.DataFrame(rows).sort_values("Drift score", ascending=False).reset_index(drop=True)
+    columns = [
+        "Feature", "Reference mean", "Simulated mean", "Reference std",
+        "Mean difference", "Drift score", "Drift detected",
+    ]
+    return pd.DataFrame(rows, columns=columns).sort_values(
+        "Drift score", ascending=False
+    ).reset_index(drop=True)
 
 
 with st.sidebar:
@@ -359,7 +431,11 @@ with st.sidebar:
         csv_file_bytes = uploaded_file.getvalue() if uploaded_file is not None else None
         target_column = None
         if uploaded_file is not None and csv_file_bytes is not None:
-            preview = pd.read_csv(io.BytesIO(csv_file_bytes))
+            try:
+                preview = pd.read_csv(io.BytesIO(csv_file_bytes))
+            except (pd.errors.ParserError, UnicodeDecodeError) as exc:
+                st.error(f"Could not read the uploaded CSV: {exc}")
+                st.stop()
             candidates = [
                 column for column in preview.columns
                 if preview[column].nunique(dropna=True) > 1
@@ -527,11 +603,12 @@ elif page == "Baseline Metrics":
         metric_table,
         use_container_width=True, hide_index=True,
     )
-    cm = confusion_matrix(y_ref, new_predictions, labels=[0, 1])
+    class_labels = list(baseline_model.classes_)
+    cm = confusion_matrix(y_ref, new_predictions, labels=class_labels)
     cm_df = pd.DataFrame(
         cm,
-        index=pd.Index(["Actual malignant", "Actual benign"]),
-        columns=pd.Index(["Predicted malignant", "Predicted benign"]),
+        index=pd.Index([f"Actual {label}" for label in class_labels]),
+        columns=pd.Index([f"Predicted {label}" for label in class_labels]),
     )
     st.markdown("**Confusion matrix — simulated data**")
     st.dataframe(cm_df, use_container_width=True)
