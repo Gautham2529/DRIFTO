@@ -19,6 +19,7 @@ from __future__ import annotations
 # pylint: disable=invalid-name
 
 import io
+import json
 from typing import cast
 
 import numpy as np
@@ -96,14 +97,14 @@ except ImportError:  # pragma: no cover - allows app to run when Plotly is absen
     px = _FallbackPX()
 
 
-def render_chart(chart_figure, use_container_width=True):
+def render_chart(chart_figure, width="stretch"):
     """Render a plot using Plotly when available; otherwise fall back to Altair."""
     if PLOTLY_AVAILABLE:
-        st.plotly_chart(chart_figure, use_container_width=use_container_width)
+        st.plotly_chart(chart_figure, width=width)
         return
     chart = chart_figure.chart if hasattr(
         chart_figure, "chart") else chart_figure
-    st.altair_chart(chart, use_container_width=use_container_width)
+    st.altair_chart(chart, width=width)
 
 
 # ---------------------------------------------------------------------------
@@ -454,10 +455,21 @@ with st.sidebar:
 
     st.divider()
     st.markdown("**Simulation settings**")
-    shift_strength = st.slider(
+    scenario = st.segmented_control(
+        "Scenario preset",
+        options=["Gentle", "Standard", "Strong"],
+        default="Standard",
+        help="Scale the shift control to explore a range of simulated drift.",
+    )
+    scenario_scale = {"Gentle": 0.5, "Standard": 1.0, "Strong": 1.5}
+    base_shift_strength = st.slider(
         "Feature shift strength (× standard deviation)",
         min_value=0.0, max_value=2.5, value=1.0, step=0.25,
         help="Controls the artificial shift applied to selected features.",
+    )
+    shift_strength = base_shift_strength * scenario_scale[scenario]
+    st.caption(
+        f"Effective shift: {shift_strength:.2f} standard deviations ({scenario.lower()} scenario)."
     )
     drift_threshold = st.slider(
         "Drift score threshold",
@@ -553,6 +565,49 @@ if page == "Overview":
             unsafe_allow_html=True,
         )
 
+    st.markdown('<div class="section-title">Explore this run</div>',
+                unsafe_allow_html=True)
+    st.caption(
+        f"{scenario} scenario · effective shift {shift_strength:.2f} SD · "
+        f"alert threshold {drift_threshold:.2f} · seed {int(seed)}"
+    )
+    run_summary = {
+        "dataset": selected_dataset_label,
+        "scenario": scenario,
+        "shift_strength_standard_deviations": float(shift_strength),
+        "drift_threshold": float(drift_threshold),
+        "random_seed": int(seed),
+        "baseline_metrics": {
+            key: float(value) for key, value in baseline_metrics.items()
+        },
+        "simulated_metrics": {
+            key: float(value) for key, value in new_metrics.items()
+        },
+        "flagged_features": drifted_df["Feature"].astype(str).tolist(),
+        "feature_drift": drift_df.to_dict(orient="records"),
+        "note": "Simulated data only; feature drift does not prove model degradation.",
+    }
+    row_results = pd.DataFrame({
+        "actual_label": pd.Series(y_ref).reset_index(drop=True),
+        "baseline_prediction": pd.Series(ref_predictions).reset_index(drop=True),
+        "simulated_prediction": pd.Series(new_predictions).reset_index(drop=True),
+    })
+    download_columns = st.columns(2)
+    download_columns[0].download_button(
+        "Download run summary (JSON)",
+        data=json.dumps(run_summary, indent=2, allow_nan=False),
+        file_name="drifto_run_summary.json",
+        mime="application/json",
+        width="stretch",
+    )
+    download_columns[1].download_button(
+        "Download row results (CSV)",
+        data=row_results.to_csv(index=False),
+        file_name="drifto_row_results.csv",
+        mime="text/csv",
+        width="stretch",
+    )
+
     st.markdown('<div class="section-title">What Drifto checks</div>',
                 unsafe_allow_html=True)
     left, right = st.columns(2)
@@ -563,7 +618,7 @@ if page == "Overview":
             "Rows": [len(reference_data), len(new_data)],
             "Features": [reference_data.shape[1], new_data.shape[1]],
         })
-        st.dataframe(compare, use_container_width=True, hide_index=True)
+        st.dataframe(compare, width="stretch", hide_index=True)
     with right:
         st.markdown("**Largest feature shifts**")
         plot_data = drift_df.head(10).sort_values("Drift score")
@@ -575,7 +630,7 @@ if page == "Overview":
         )
         fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
                           plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=45, b=10))
-        render_chart(fig, use_container_width=True)
+        render_chart(fig, width="stretch")
 
     st.markdown(
         '<div class="note"><strong>Interpretation:</strong> Feature drift means that the observed '
@@ -601,7 +656,7 @@ elif page == "Baseline Metrics":
     metric_table = pd.DataFrame(metric_rows)
     st.dataframe(
         metric_table,
-        use_container_width=True, hide_index=True,
+        width="stretch", hide_index=True,
     )
     class_labels = list(baseline_model.classes_)
     cm = confusion_matrix(y_ref, new_predictions, labels=class_labels)
@@ -611,7 +666,7 @@ elif page == "Baseline Metrics":
         columns=pd.Index([f"Predicted {label}" for label in class_labels]),
     )
     st.markdown("**Confusion matrix — simulated data**")
-    st.dataframe(cm_df, use_container_width=True)
+    st.dataframe(cm_df, width="stretch")
     st.caption("This is a controlled simulation using retained reference labels, not independently collected production outcomes.")
 
 elif page == "Prediction Distribution":
@@ -627,7 +682,7 @@ elif page == "Prediction Distribution":
     )
     fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)")
-    render_chart(fig, use_container_width=True)
+    render_chart(fig, width="stretch")
     st.markdown(
         '<div class="note">A change in predicted class proportions can be a useful monitoring signal, '
         'but it is not proof of concept drift or model failure. Investigate it alongside feature changes '
@@ -642,7 +697,7 @@ elif page == "Feature Drift Analysis":
     styled_drift["Highlight"] = styled_drift["Drift detected"].astype(str)
     st.dataframe(
         styled_drift,
-        use_container_width=True, height=520, hide_index=True,
+        width="stretch", height=520, hide_index=True,
     )
     selected_features = st.multiselect(
         "Compare feature distributions",
@@ -662,7 +717,7 @@ elif page == "Feature Drift Analysis":
                      title="Feature distributions: reference vs simulated")
         fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
                           plot_bgcolor="rgba(0,0,0,0)")
-        render_chart(fig, use_container_width=True)
+        render_chart(fig, width="stretch")
 
 elif page == "Drift Warnings":
     st.markdown('<div class="section-title">Drift Warnings</div>',
@@ -677,7 +732,7 @@ elif page == "Drift Warnings":
         st.dataframe(
             drifted_df[["Feature", "Mean difference",
                         "Drift score", "Drift detected"]].copy(),
-            use_container_width=True, hide_index=True,
+            width="stretch", hide_index=True,
         )
     else:
         st.markdown(

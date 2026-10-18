@@ -1,200 +1,96 @@
-<div align="center">
+# Drifto
 
-# 🌊 Drifto
-### ML Model Monitoring & Data Drift Dashboard
+Drifto is an educational Streamlit dashboard for exploring model performance and feature drift on tabular classification data. It trains a Random Forest model, simulates shifted data, and compares the simulated sample with a held-out reference split.
 
-**Your model is deployed. Is it still trustworthy?**
+> Drifto is a local prototype. It does not connect to a live production model or data stream, and simulated drift is not evidence that a deployed model has degraded.
 
-Drifto helps make machine-learning model behaviour easier to inspect by bringing model evaluation, simulated production data, and feature-drift monitoring into one workflow.
+## Current features
 
-<br/>
+- Built-in scikit-learn datasets: Breast Cancer, Iris, and Wine.
+- CSV upload with a selectable target column. Numeric feature columns are supported; categorical feature encoding is not implemented.
+- Missing target rows are discarded. Missing numeric feature values are filled using medians calculated from the training split. Infinite values and unsupported feature types are rejected with an explanation.
+- Random Forest classification with baseline accuracy, weighted precision, weighted recall, and weighted F1.
+- Reproducible simulated data with a seed, shift strength, and Gentle, Standard, or Strong scenario preset.
+- Feature drift scoring using absolute mean difference divided by the reference standard deviation. Features at or above the selected threshold are flagged.
+- Dashboard views for overview, baseline metrics, prediction distribution, feature drift analysis, drift warnings, and project information.
+- JSON run-summary and CSV row-result downloads from the Overview page.
+- Plotly charts, with an Altair fallback if Plotly is unavailable.
 
-![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-orange?style=for-the-badge&logo=scikitlearn&logoColor=white)
-![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
-![Status](https://img.shields.io/badge/Project-Educational%20Demo-7C3AED?style=for-the-badge)
+## How the dashboard works
 
-<br/>
+1. Choose a built-in dataset or upload a CSV and select its target column.
+2. Drifto creates a stratified training/reference split and trains a Random Forest on the training rows.
+3. It simulates changes to up to six numeric features in the reference rows. The random seed makes the simulation repeatable for the same settings.
+4. It predicts the simulated rows and compares predictions against the retained reference labels. This is a controlled experiment, not independently observed production performance.
+5. It calculates a standardized mean-shift score for each numeric feature and flags scores that meet the configured threshold.
+6. Explore charts and tables, adjust settings, or download the run summary and row-level results.
 
-**Monitor • Detect • Understand • Improve**
-
-</div>
-
----
-
-## 📌 Table of Contents
-
-- [🔎 Overview](#-overview)
-- [💡 Why Drifto?](#-why-drifto)
-- [✨ Key Features](#-key-features)
-- [⚙️ How It Works](#️-how-it-works)
-- [🧰 Tech Stack](#-tech-stack)
-- [🗂️ Project Structure](#️-project-structure)
-- [🚀 Getting Started](#-getting-started)
-- [📊 Understanding Drift](#-understanding-drift)
-- [🖥️ Dashboard Preview](#️-dashboard-preview)
-- [🛣️ Roadmap](#️-roadmap)
-- [⚠️ Scope & Limitations](#️-scope--limitations)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-
----
-
-## 🔎 Overview
-
-Machine-learning models can continue running even when the data they receive starts to change. A successful training run does not guarantee that a model will behave just as well on future data.
-
-**Drifto** is an educational ML monitoring project designed to demonstrate a practical monitoring workflow:
-
-1. 🤖 **Train** a machine-learning model using a reproducible dataset.
-2. 📏 **Evaluate** its baseline performance with standard classification metrics.
-3. 🌊 **Simulate** new data with controlled changes to selected features.
-4. 🔍 **Measure** feature-level changes between reference and simulated data.
-5. 📊 **Explore** the resulting monitoring information in a dashboard.
-
-The goal is to make model monitoring tangible, visual, and easier to understand.
-
-## 💡 Why Drifto?
-
-A model can be alive without being well. Data distributions change, user behaviour evolves, and upstream pipelines can introduce unexpected values. If nobody checks, the model may keep producing predictions while the assumptions behind it quietly become less reliable.
-
-| Challenge | What it means |
-|---|---|
-| 🌊 **Data drift** | The distribution of model input features changes over time. |
-| 🧠 **Concept drift** | The relationship between inputs and the target changes. |
-| 📉 **Performance degradation** | Predictive quality worsens on newly labelled data. |
-| 🧹 **Data-quality issues** | Missing, invalid, or unexpected values enter the pipeline. |
-
-Drifto focuses on an approachable, repeatable demonstration of **feature-level data drift**. It is a learning project, not a claim that one score can diagnose every production ML problem.
-
-## ✨ Key Features
-
-> These descriptions should match the modules implemented in the repository. Adjust the list if your current code differs.
-
-| Feature | Description |
-|---|---|
-| 🤖 **Model training** | Train a baseline classification model with scikit-learn. |
-| 📏 **Baseline evaluation** | Review classification metrics such as accuracy, precision, recall, and F1-score, where implemented. |
-| 🧪 **Data simulation** | Generate a comparison dataset with controlled noise or feature shifts, if enabled in the simulation module. |
-| 🔍 **Feature drift scoring** | Compare reference and new feature distributions using the project's implemented scoring method. |
-| 🚦 **Drift flagging** | Highlight features that cross a configurable threshold, when configured. |
-| 📈 **Interactive dashboard** | Inspect available metrics, comparisons, and monitoring outputs through Streamlit. |
-| 💾 **Saved artefacts** | Keep generated models, datasets, metrics, and reports reproducible where persistence is implemented. |
-
-## ⚙️ How It Works
-
-```mermaid
-flowchart TD
-    A[📦 Load Dataset] --> B[🤖 Train ML Model]
-    B --> C[📏 Evaluate Baseline]
-    C --> D[🗃️ Save Reference Data]
-    D --> E[🧪 Simulate New Data]
-    E --> F[🔍 Calculate Feature Drift]
-    F --> G[🚦 Generate Monitoring Report]
-    G --> H[📊 Explore in Dashboard]
-```
-
-### The workflow at a glance
-
-**1. Establish a baseline**  
-Train and evaluate a model on a reference dataset. The baseline provides a point of comparison.
-
-**2. Create a comparison dataset**  
-Use the project's data simulation step to create new inputs with controlled changes.
-
-**3. Compare the data**  
-Calculate drift scores using the method implemented by Drifto and identify features that exceed the selected threshold.
-
-**4. Inspect the results**  
-Use the dashboard and saved reports to understand which features changed and what deserves further investigation.
-
-## 🧰 Tech Stack
-
-| Technology | Role |
-|---|---|
-| 🐍 **Python** | Core programming language |
-| 🧠 **scikit-learn** | Machine-learning model and evaluation utilities |
-| 🧮 **NumPy** | Numerical operations and simulation |
-| 🧾 **pandas** | Tabular data handling |
-| 📊 **Streamlit** | Interactive dashboard |
-| 💾 **joblib / JSON / CSV** | Model and report persistence, where used |
-
-Check `requirements.txt` for the exact versions used by your current project.
-
-## 🗂️ Project Structure
-
-The tree below is an **illustrative layout** for a modular Drifto implementation. Keep it aligned with the files that actually exist in your repository.
+The drift score is:
 
 ```text
-drifto/
-├── app.py                  # Streamlit dashboard entry point
-├── requirements.txt        # Project dependencies
-├── .gitignore              # Files Git should ignore
-│
-├── src/                    # Monitoring pipeline modules
-│   ├── __init__.py
-│   ├── data.py             # Load and split data
-│   ├── train.py            # Train and evaluate the model
-│   ├── simulate.py         # Simulate new data
-│   ├── monitor.py          # Calculate drift and create reports
-│   └── utils.py             # Shared helpers
-│
-├── models/                 # Generated model artefacts
-│   └── .gitkeep
-│
-└── outputs/                # Generated reports and datasets
-    └── .gitkeep
+abs(simulated feature mean - reference feature mean) / reference feature standard deviation
 ```
 
-## 🚀 Getting Started
+A zero-variance reference feature receives a score of zero. This score is a simple effect-size indicator. It does not test distribution shape, feature relationships, statistical significance, or concept drift.
 
-### ✅ Prerequisites
+## Project structure
 
-- Python **3.11 or later** (or the version specified by your project)
-- Git
-- A terminal, such as PowerShell or VS Code's integrated terminal
-
-### 1️⃣ Clone the repository
-
-```bash
-git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY.git
-cd YOUR-REPOSITORY
+```text
+.
+|-- app.py                  # Streamlit dashboard
+|-- requirements.txt        # Python dependencies
+|-- README.md
+|-- .gitignore
+|-- src/
+|   |-- data.py             # Built-in datasets and data helpers
+|   |-- train.py            # Command-line baseline training pipeline
+|   |-- simulate.py         # Command-line production-data simulation
+|   |-- monitor.py          # Command-line drift report generation
+|   `-- utils.py            # Shared file and console helpers
+|-- models/                 # Generated model artifacts (ignored by Git)
+`-- outputs/                # Generated data and reports (ignored by Git)
 ```
 
-> Replace the URL and folder name with your actual GitHub repository details.
+## Run locally
 
-### 2️⃣ Create a virtual environment
+### Requirements
 
-**Windows — PowerShell**
+- Python 3.11 or later
+- Git, if cloning the repository
+
+### Install
+
+Windows PowerShell:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-**Windows — Command Prompt**
-
-```bat
-.venv\Scripts\activate.bat
-```
-
-**macOS / Linux**
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### 3️⃣ Install dependencies
-
-```bash
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-### 4️⃣ Run the pipeline
+macOS or Linux:
 
-Use the commands that correspond to the modules in your repository. If your project contains these modules, the workflow may look like this:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+### Start the dashboard
+
+From the repository root, run:
+
+```bash
+streamlit run app.py
+```
+
+Open the local URL printed by Streamlit, usually `http://localhost:8501`.
+
+### Run the file-based pipeline
+
+The command-line pipeline is separate from the dashboard and writes generated artifacts into `models/` and `outputs/`. Run its steps in order:
 
 ```bash
 python -m src.train
@@ -202,100 +98,46 @@ python -m src.simulate
 python -m src.monitor
 ```
 
-### 5️⃣ Launch the dashboard
+These generated files are intentionally ignored by Git. They can be recreated by running the pipeline.
 
-If `app.py` is a Streamlit application:
+## Hosting status
+
+The app is structured to run as a Streamlit application and lists its dependencies in `requirements.txt`. To host it, publish the repository to a Git provider and configure the hosting service to install `requirements.txt` and start `app.py` with `streamlit run app.py`.
+
+Before sharing a hosted instance, review the host's resource and upload limits and decide whether uploaded datasets may be processed there. Uploaded data and derived datasets may remain in Streamlit's in-process cache for the life of the app process. Drifto has no sign-in flow, role controls, persistent run history, live monitoring connection, scheduled runs, or production alerting. Downloaded reports are generated for the user to save.
+
+## Data and interpretation limits
+
+- CSV features must be numeric. Target labels may be numeric or categorical.
+- The demo simulates drift in selected numeric features and retains reference labels for controlled metric comparisons.
+- A change in feature distributions or predicted class proportions does not prove performance degradation.
+- Real performance monitoring requires verified labels from the monitored population and an appropriate evaluation process.
+- The mean-shift score can miss changes in distribution shape and other forms of data or concept drift.
+- The app does not automatically retrain, alert, deploy, or roll back models.
+
+## Checks
+
+The repository does not currently include a committed automated test suite. Useful local checks include:
 
 ```bash
+python -m compileall -q app.py src
 streamlit run app.py
 ```
 
-Then open **http://localhost:8501** in your browser.
+The dashboard has also been exercised with Streamlit's `AppTest` during development, including its pages, scenario controls, and download buttons.
 
-> If your entry point or module names are different, use the actual filenames in your project.
+## Roadmap
 
-## 📊 Understanding Drift
+- Add a maintained automated test suite and continuous integration.
+- Support categorical feature encoding with explicit preprocessing controls.
+- Compare mean-shift scores with statistical drift tests.
+- Add persistent run history and monitoring against an authorized live source.
+- Add authentication, access controls, and operational alerting before production use.
 
-A drift score is a signal to investigate, not an automatic verdict that a model is broken.
+## Contributing
 
-For example, a simple mean-shift score can compare a feature's reference and new-data averages relative to the reference spread:
+Bug reports and improvements are welcome. Please describe the expected behavior, steps to reproduce issues, and the environment used. Add or update tests when changing data validation, training, or drift calculations.
 
-\[
-\text{Drift Score} = \frac{|\mu_{\text{new}} - \mu_{\text{reference}}|}{\sigma_{\text{reference}}}
-\]
+## License
 
-Where:
-
-- \(\mu_{\text{reference}}\) is the reference-data mean.
-- \(\mu_{\text{new}}\) is the new-data mean.
-- \(\sigma_{\text{reference}}\) is the reference-data standard deviation.
-
-This score is interpretable, but limited. It can miss changes in distribution shape, relationships between features, and changes in the target relationship. Constant or nearly constant reference features also require careful handling.
-
-**Important:** This equation applies only if this is the method implemented in your monitoring code. Update this section if Drifto uses a different drift calculation.
-
-## 🖥️ Dashboard Preview
-
-The README will look even better with real screenshots from your running dashboard.
-
-Create a `screenshots/` directory, add an image such as `dashboard.png`, and uncomment the example below:
-
-```markdown
-<!-- Replace with a real screenshot committed to the repository -->
-<!-- ![Drifto Dashboard](screenshots/dashboard.png) -->
-```
-
-Suggested screenshots:
-- 📌 Overall dashboard overview
-- 📊 Feature drift comparison
-- 🚦 Drift report or flagged-feature table
-
-## 🛣️ Roadmap
-
-Potential next steps for evolving Drifto:
-
-- [ ] Add a polished model-health summary
-- [ ] Visualize reference and new-data distributions side by side
-- [ ] Add monitoring thresholds configurable from the dashboard
-- [ ] Track metrics across repeated evaluation runs
-- [ ] Add tests for data validation and drift calculations
-- [ ] Add robust handling for missing values and constant features
-- [ ] Compare the simple drift score with statistical methods such as PSI or the Kolmogorov–Smirnov test
-- [ ] Add reproducible sample data and screenshots
-- [ ] Explore automated alerts and scheduled monitoring
-
-## ⚠️ Scope & Limitations
-
-Drifto is intended as an **educational and portfolio project**.
-
-- Simulated drift is useful for demonstrating monitoring logic, but it is not the same as monitoring a live production service.
-- Feature drift does not, by itself, prove that model accuracy has declined.
-- Measuring actual performance generally requires ground-truth labels and a suitable evaluation process.
-- Production systems often require robust statistical tests, data validation, logging, alerting, access controls, and operational monitoring.
-
-Be precise about what the current version implements. A good monitoring system knows the difference between a warning light and a confirmed engine failure.
-
-## 🤝 Contributing
-
-Ideas, bug reports, and improvements are welcome.
-
-1. Fork the repository.
-2. Create a feature branch: `git checkout -b feat/your-feature`
-3. Make and test your changes.
-4. Commit with a clear message: `git commit -m "Add your feature"`
-5. Push your branch and open a pull request.
-
-## 📄 License
-
-No license is implied by this README. If you intend to publish Drifto as open source, choose a license and add the corresponding `LICENSE` file. Update this section once that is done.
-
----
-
-<div align="center">
-
-### 🌊 Drifto
-**See the shift. Understand the signal. Monitor with confidence.**
-
-Built with 🧠, Python, and a healthy suspicion of models left unattended.
-
-</div>
+No license is currently provided. Add a `LICENSE` file before redistributing this project under an open-source license.

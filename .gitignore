@@ -1,4 +1,4 @@
-# ── Python ──────────────────────────────────────────────────
+# Python bytecode and environments
 __pycache__/
 *.py[cod]
 *$py.class
@@ -7,47 +7,64 @@ __pycache__/
 *.so
 *.egg
 *.egg-info/
-dist/
-build/
 .eggs/
 *.egg-link
-
-# ── Virtual environments ─────────────────────────────────────
 .venv/
 venv/
 env/
 ENV/
-.env
 
-# ── Jupyter ──────────────────────────────────────────────────
+# Build and test artifacts
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Notebook and tool caches
 .ipynb_checkpoints/
+.cache/
+.streamlit/cache/
 
-# ── macOS / system files ─────────────────────────────────────
-.DS_Store
-.AppleDouble
-.LSOverride
-Thumbs.db
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.aws/
+.azure/
+.gcloud/
+*.pem
+*.key
 
-# ── IDEs ─────────────────────────────────────────────────────
+# IDE and operating system files
 .idea/
 .vscode/
 *.sublime-project
 *.sublime-workspace
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
 
-# ── Model artifacts ──────────────────────────────────────────
-models/*.joblib
-models/*.pkl
+# Generated model artifacts
+/models/*
+!/models/.gitkeep
 
-# ── Generated outputs ────────────────────────────────────────
-outputs/*.csv
-outputs/*.json
-outputs/*.png
+# Generated datasets, predictions, and reports
+/outputs/*
+!/outputs/.gitkeep
+/data/
 
-# Keep empty folders
-!models/.gitkeep
-!outputs/.gitkeep
-
-# ── Logs & temp files ────────────────────────────────────────
+# Logs and temporary files
 *.log
 *.tmp
 *.bak
