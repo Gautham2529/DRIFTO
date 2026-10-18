@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import io
 import json
+import html
 from typing import cast
 
 import numpy as np
@@ -96,6 +97,10 @@ except ImportError:  # pragma: no cover - allows app to run when Plotly is absen
 
     px = _FallbackPX()
 
+MAX_UPLOAD_MB = 10
+MAX_CSV_ROWS = 10_000
+MAX_CSV_FEATURES = 50
+
 
 def render_chart(chart_figure, width="stretch"):
     """Render a plot using Plotly when available; otherwise fall back to Altair."""
@@ -123,8 +128,9 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    html, body, [class*="css"] { font-family: Inter, sans-serif; }
+    html, body, [class*="css"] {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
     .stApp { background: #0b1018; }
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #101d2c 0%, #0a1420 100%);
@@ -183,7 +189,7 @@ st.markdown(
 # ---------------------------------------------------------------------------
 
 
-@st.cache_data
+@st.cache_data(ttl=3600, max_entries=3)
 def load_selected_dataset(
     source_choice: str,
     selected_dataset_name: str,
@@ -200,6 +206,14 @@ def load_selected_dataset(
         dataframe = pd.read_csv(io.BytesIO(uploaded_file_bytes))
         if dataframe.empty:
             raise ValueError("The uploaded CSV contains no data rows.")
+        if len(dataframe) > MAX_CSV_ROWS:
+            raise ValueError(
+                f"The CSV exceeds the {MAX_CSV_ROWS:,}-row limit for this hosted demo."
+            )
+        if dataframe.shape[1] > MAX_CSV_FEATURES + 1:
+            raise ValueError(
+                f"The CSV exceeds the {MAX_CSV_FEATURES}-feature limit for this hosted demo."
+            )
         if dataframe.columns.duplicated().any():
             raise ValueError("The uploaded CSV contains duplicate column names.")
         if target_name is None:
@@ -269,7 +283,7 @@ def class_name_map(value_sequence):
     return {value: str(value) for value in unique_values}
 
 
-@st.cache_resource
+@st.cache_resource(ttl=3600, max_entries=3)
 def train_baseline(
     selected_dataset_name: str = "breast_cancer",
     source_name: str = "builtin",
@@ -428,7 +442,9 @@ with st.sidebar:
         target_column = None
     else:
         dataset_name = "breast_cancer"
-        uploaded_file = st.file_uploader("CSV dataset", type=["csv"])
+        uploaded_file = st.file_uploader(
+            "CSV dataset", type=["csv"], max_upload_size=MAX_UPLOAD_MB
+        )
         csv_file_bytes = uploaded_file.getvalue() if uploaded_file is not None else None
         target_column = None
         if uploaded_file is not None and csv_file_bytes is not None:
@@ -537,7 +553,7 @@ st.markdown(
       <span class="eyebrow">CONCEPT DRIFT RESEARCH</span>
       <h1>🌊 Drifto</h1>
       <p>An interactive ML monitoring prototype that compares reference data with simulated incoming data,
-      highlights feature distribution changes, and tracks model performance using the {selected_dataset_label} dataset.</p>
+      highlights feature distribution changes, and tracks model performance using the {html.escape(selected_dataset_label)} dataset.</p>
     </div>
     """,
     unsafe_allow_html=True,

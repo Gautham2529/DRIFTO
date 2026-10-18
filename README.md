@@ -7,7 +7,7 @@ Drifto is an educational Streamlit dashboard for exploring model performance and
 ## Current features
 
 - Built-in scikit-learn datasets: Breast Cancer, Iris, and Wine.
-- CSV upload with a selectable target column. Numeric feature columns are supported; categorical feature encoding is not implemented.
+- CSV upload up to 10 MB, 10,000 rows, and 50 numeric feature columns with a selectable target. Categorical feature encoding is not implemented.
 - Missing target rows are discarded. Missing numeric feature values are filled using medians calculated from the training split. Infinite values and unsupported feature types are rejected with an explanation.
 - Random Forest classification with baseline accuracy, weighted precision, weighted recall, and weighted F1.
 - Reproducible simulated data with a seed, shift strength, and Gentle, Standard, or Strong scenario preset.
@@ -104,7 +104,7 @@ These generated files are intentionally ignored by Git. They can be recreated by
 
 The app is structured to run as a Streamlit application and lists its dependencies in `requirements.txt`. To host it, publish the repository to a Git provider and configure the hosting service to install `requirements.txt` and start `app.py` with `streamlit run app.py`.
 
-Before sharing a hosted instance, review the host's resource and upload limits and decide whether uploaded datasets may be processed there. Uploaded data and derived datasets may remain in Streamlit's in-process cache for the life of the app process. Drifto has no sign-in flow, role controls, persistent run history, live monitoring connection, scheduled runs, or production alerting. Downloaded reports are generated for the user to save.
+Before sharing a hosted instance, decide whether uploaded datasets may be processed there. Uploaded data and derived datasets are cached in the Streamlit process, with a maximum of three entries and a one-hour time-to-live. Drifto has no sign-in flow, role controls, persistent run history, live monitoring connection, scheduled runs, or production alerting. Downloaded reports are generated for the user to save.
 
 ## Data and interpretation limits
 
