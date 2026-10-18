@@ -220,7 +220,8 @@ def load_selected_dataset(
                 f"The CSV exceeds the {MAX_CSV_FEATURES}-feature limit for this hosted demo."
             )
         if dataframe.columns.duplicated().any():
-            raise ValueError("The uploaded CSV contains duplicate column names.")
+            raise ValueError(
+                "The uploaded CSV contains duplicate column names.")
         if target_name is None:
             target_name = infer_target_column(dataframe)
         if target_name is None or target_name not in dataframe.columns:
@@ -234,10 +235,12 @@ def load_selected_dataset(
             columns=[selected_target]
         ).copy()
         valid_targets = y.notna()
-        features_frame = features_frame.loc[valid_targets].reset_index(drop=True)
+        features_frame = features_frame.loc[valid_targets].reset_index(
+            drop=True)
         y = y.loc[valid_targets].reset_index(drop=True)
         if features_frame.shape[1] == 0:
-            raise ValueError("The CSV must contain at least one feature column.")
+            raise ValueError(
+                "The CSV must contain at least one feature column.")
         non_numeric = list(
             features_frame.select_dtypes(exclude=[np.number]).columns
         )
@@ -306,16 +309,19 @@ def train_baseline(
         target_name=target_column_name,
     )
     if features_frame.empty or features_frame.shape[1] == 0:
-        raise ValueError("The dataset must contain at least one row and feature.")
+        raise ValueError(
+            "The dataset must contain at least one row and feature.")
     if y.isna().any():
-        raise ValueError("The target column contains missing labels; remove those rows.")
+        raise ValueError(
+            "The target column contains missing labels; remove those rows.")
     features_frame = features_frame.apply(pd.to_numeric, errors="raise")
     X_train, reference_x, y_train, reference_y = train_test_split(
         features_frame, y, test_size=0.2, random_state=random_seed, stratify=y
     )
     medians = X_train.median()
     if medians.isna().any():
-        raise ValueError("Feature columns must contain at least one numeric value each.")
+        raise ValueError(
+            "Feature columns must contain at least one numeric value each.")
     X_train = X_train.fillna(medians)
     reference_x = reference_x.fillna(medians)
     if not np.isfinite(X_train.to_numpy(dtype=float)).all() or not np.isfinite(
@@ -360,14 +366,17 @@ def simulate_production(
 ):
     """Create reproducible simulated data by shifting selected numeric features."""
     if not np.isfinite(shift_magnitude) or shift_magnitude < 0:
-        raise ValueError("Shift strength must be a finite, non-negative number.")
+        raise ValueError(
+            "Shift strength must be a finite, non-negative number.")
     rng = np.random.default_rng(random_seed)
     simulated = reference.copy().reset_index(drop=True)
     if reference.empty or reference.shape[1] == 0:
-        raise ValueError("Reference data must contain at least one row and feature.")
+        raise ValueError(
+            "Reference data must contain at least one row and feature.")
     columns = list(simulated.select_dtypes(include=[np.number]).columns)
     if not columns:
-        raise ValueError("Reference data must contain numeric features to simulate drift.")
+        raise ValueError(
+            "Reference data must contain numeric features to simulate drift.")
     count = max(1, min(6, max(1, len(columns) // 8)))
     shifted_columns = columns[:count]
 
@@ -386,18 +395,22 @@ def simulate_production(
 def calculate_drift(reference: pd.DataFrame, current: pd.DataFrame, threshold: float):
     """Compare numeric features and return standardized mean-shift scores."""
     if not np.isfinite(threshold) or threshold < 0:
-        raise ValueError("Drift threshold must be a finite, non-negative number.")
+        raise ValueError(
+            "Drift threshold must be a finite, non-negative number.")
     if list(reference.columns) != list(current.columns):
-        raise ValueError("Reference and simulated data must have matching columns.")
+        raise ValueError(
+            "Reference and simulated data must have matching columns.")
     if reference.empty or current.empty:
-        raise ValueError("Reference and simulated data must each contain at least one row.")
+        raise ValueError(
+            "Reference and simulated data must each contain at least one row.")
     rows = []
     for feature_name in reference.select_dtypes(include=[np.number]).columns:
         ref_mean = float(reference[feature_name].mean())
         new_mean = float(current[feature_name].mean())
         ref_std = float(reference[feature_name].std(ddof=0))
         if not np.isfinite(ref_mean) or not np.isfinite(new_mean):
-            raise ValueError(f"Feature '{feature_name}' contains non-finite values.")
+            raise ValueError(
+                f"Feature '{feature_name}' contains non-finite values.")
         score = abs(new_mean - ref_mean) / ref_std if ref_std > 1e-12 else 0.0
         rows.append({
             "Feature": feature_name,
