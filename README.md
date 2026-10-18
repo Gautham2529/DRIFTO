@@ -2,6 +2,8 @@
 
 Drifto is an educational Streamlit dashboard for exploring model performance and feature drift on tabular classification data. It trains a Random Forest model, simulates shifted data, and compares the simulated sample with a held-out reference split.
 
+**Live app:** [Open Drifto](https://drifto-3ardduwkjtett9opstvfpo.streamlit.app/)
+
 > Drifto is a local prototype. It does not connect to a live production model or data stream, and simulated drift is not evidence that a deployed model has degraded.
 
 ## Current features
