@@ -37,6 +37,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 
 from src.data import BUILTIN_DATASETS, infer_target_column, load_dataset as load_source_dataset
+from src.auth import render_auth_gate
 
 try:
     import plotly.express as px
@@ -183,6 +184,10 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# If Auth0 is configured, prevent unauthenticated users from reaching the
+# dashboard. Without secrets, keep the existing public prototype usable.
+render_auth_gate()
 
 # ---------------------------------------------------------------------------
 # Data and model helpers

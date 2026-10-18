@@ -17,6 +17,7 @@ Drifto is an educational Streamlit dashboard for exploring model performance and
 - Dashboard views for overview, baseline metrics, prediction distribution, feature drift analysis, drift warnings, and project information.
 - JSON run-summary and CSV row-result downloads from the Overview page.
 - Plotly charts, with an Altair fallback if Plotly is unavailable.
+- Optional Auth0 sign-in gate using Streamlit's OIDC support. Auth0 can provide email/password registration and Google, Facebook, and GitHub sign-in when those connections are enabled by the app owner.
 
 ## How the dashboard works
 
@@ -40,15 +41,20 @@ A zero-variance reference feature receives a score of zero. This score is a simp
 ```text
 .
 |-- app.py                  # Streamlit dashboard
+|-- .streamlit/
+|   `-- secrets.example.toml # Safe template for optional OIDC configuration
 |-- requirements.txt        # Python dependencies
 |-- README.md
 |-- .gitignore
 |-- src/
+|   |-- auth.py             # Optional OIDC authentication gate
 |   |-- data.py             # Built-in datasets and data helpers
 |   |-- train.py            # Command-line baseline training pipeline
 |   |-- simulate.py         # Command-line production-data simulation
 |   |-- monitor.py          # Command-line drift report generation
 |   `-- utils.py            # Shared file and console helpers
+|-- tests/
+|   `-- test_auth.py        # Authentication configuration checks
 |-- models/                 # Generated model artifacts (ignored by Git)
 `-- outputs/                # Generated data and reports (ignored by Git)
 ```
@@ -90,6 +96,17 @@ streamlit run app.py
 
 Open the local URL printed by Streamlit, usually `http://localhost:8501`.
 
+### Optional account sign-in
+
+Authentication uses Streamlit's built-in OpenID Connect flow and Auth0 as the identity provider. Drifto does not collect or store passwords. To offer email/password registration and Google, Facebook, and GitHub sign-in, configure an Auth0 tenant, enable a database connection with sign-up, enable the desired social connections, and allow those connections for the Drifto application in Auth0. Auth0's Universal Login then presents the available methods.
+
+1. Create an Auth0 application and allow the callback URL `http://localhost:8501/oauth2callback` for local development. For the hosted app, allow `https://drifto-3ardduwkjtett9opstvfpo.streamlit.app/oauth2callback`.
+2. Copy `.streamlit/secrets.example.toml` to `.streamlit/secrets.toml` and fill in the Auth0 client ID, client secret, tenant domain, and a long random `cookie_secret`. Set `redirect_uri` to the callback URL for the environment being used.
+3. For the hosted app, add the same values in its Streamlit Community Cloud **Secrets** settings. Keep production credentials out of Git and never paste them into chat.
+4. Restart the local app after changing secrets. When valid Auth0 settings are present, unauthenticated visitors are sent to the sign-in page; without settings the current public demo remains available. A present but incomplete authentication configuration locks the app instead of silently disabling sign-in.
+
+Authentication verifies identity but does not provide per-user authorization or persistent account-specific analysis storage. Uploaded files and run results are not saved as user records.
+
 ### Run the file-based pipeline
 
 The command-line pipeline is separate from the dashboard and writes generated artifacts into `models/` and `outputs/`. Run its steps in order:
@@ -106,7 +123,7 @@ These generated files are intentionally ignored by Git. They can be recreated by
 
 The app is structured to run as a Streamlit application and lists its dependencies in `requirements.txt`. To host it, publish the repository to a Git provider and configure the hosting service to install `requirements.txt` and start `app.py` with `streamlit run app.py`.
 
-Before sharing a hosted instance, decide whether uploaded datasets may be processed there. Uploaded data and derived datasets are cached in the Streamlit process, with a maximum of three entries and a one-hour time-to-live. Drifto has no sign-in flow, role controls, persistent run history, live monitoring connection, scheduled runs, or production alerting. Downloaded reports are generated for the user to save.
+Before sharing a hosted instance, decide whether uploaded datasets may be processed there. Uploaded data and derived datasets are cached in the Streamlit process, with a maximum of three entries and a one-hour time-to-live. Auth0 sign-in is optional and is inactive until its secrets are configured. Drifto has no role controls, persistent run history, live monitoring connection, scheduled runs, or production alerting. Downloaded reports are generated for the user to save.
 
 ## Data and interpretation limits
 
@@ -134,7 +151,7 @@ The dashboard has also been exercised with Streamlit's `AppTest` during developm
 - Support categorical feature encoding with explicit preprocessing controls.
 - Compare mean-shift scores with statistical drift tests.
 - Add persistent run history and monitoring against an authorized live source.
-- Add authentication, access controls, and operational alerting before production use.
+- Add per-user authorization and persistent account-specific history before production use.
 
 ## Contributing
 
