@@ -314,6 +314,15 @@ def train_baseline(
     if y.isna().any():
         raise ValueError(
             "The target column contains missing labels; remove those rows.")
+    class_count = int(y.nunique(dropna=True))
+    if class_count < 2:
+        raise ValueError(
+            "The target column must contain at least two distinct classes for classification."
+        )
+    if y.value_counts(dropna=True).min() < 2:
+        raise ValueError(
+            "Each class in the target column must have at least two labeled rows for stratified splitting."
+        )
     features_frame = features_frame.apply(pd.to_numeric, errors="raise")
     X_train, reference_x, y_train, reference_y = train_test_split(
         features_frame, y, test_size=0.2, random_state=random_seed, stratify=y
@@ -377,7 +386,7 @@ def simulate_production(
     if not columns:
         raise ValueError(
             "Reference data must contain numeric features to simulate drift.")
-    count = max(1, min(6, max(1, len(columns) // 8)))
+    count = min(6, len(columns))
     shifted_columns = columns[:count]
 
     for feature_name in shifted_columns:
@@ -655,7 +664,7 @@ if page == "Overview":
         st.dataframe(compare, width="stretch", hide_index=True)
     with right:
         st.markdown("**Largest feature shifts**")
-        plot_data = drift_df.head(10).sort_values("Drift score")
+        plot_data = drift_df.head(10).sort_values("Drift score", ascending=False)
         fig = px.bar(
             plot_data, x="Drift score", y="Feature", orientation="h",
             color="Drift detected",
